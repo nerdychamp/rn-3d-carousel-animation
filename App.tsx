@@ -60,9 +60,12 @@ const IMAGE_WIDTH = width * 0.65;
 const IMAGE_HEIGHT = IMAGE_WIDTH * 0.7;
 const SPACING = 20;
 
-export default function () {
+export default function Main() {
   const [activeIndex, setActiveIndex] = React.useState<number>(0);
   const imageRef = React.useRef<FlatList<IData>>(null);
+
+  const scrollX = React.useRef(new Animated.Value(0)).current;
+  const progress = Animated.modulo(Animated.divide(scrollX, width), width);
 
   const scrollToIndex = (index: number) => {
     setActiveIndex(index);
@@ -90,10 +93,14 @@ export default function () {
       <StatusBar hidden />
       <SafeAreaView style={{ marginTop: SPACING * 4 }}>
         <View style={{ height: IMAGE_HEIGHT * 2.1 }}>
-          <FlatList
+          <Animated.FlatList
             data={DATA}
             ref={imageRef}
-            style={{ flexGrow: 0 }}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: true },
+            )}
+            style={{ flexGrow: 0, zIndex: 99999 }}
             initialScrollIndex={0}
             keyExtractor={(item) => item.key}
             horizontal
@@ -110,11 +117,29 @@ export default function () {
               setActiveIndex(Math.floor(e.nativeEvent.contentOffset.x / width));
             }}
             renderItem={({ item, index }) => {
+              const inputRange = [
+                (index - 1) * width,
+                index * width,
+                (index + 1) * width,
+              ];
+
+              const opacity = scrollX.interpolate({
+                inputRange,
+                outputRange: [0, 1, 0],
+              });
+
+              const translateY = scrollX.interpolate({
+                inputRange,
+                outputRange: [50, 0, 20],
+              });
+
               return (
-                <View
+                <Animated.View
                   style={{
                     width,
                     paddingVertical: SPACING,
+                    opacity,
+                    transform: [{ translateY }],
                   }}
                 >
                   <Image
@@ -125,7 +150,7 @@ export default function () {
                       resizeMode: 'cover',
                     }}
                   />
-                </View>
+                </Animated.View>
               );
             }}
           />
@@ -135,11 +160,39 @@ export default function () {
               alignItems: 'center',
               paddingHorizontal: SPACING * 2,
               marginLeft: SPACING * 2,
+              zIndex: 99,
             }}
           >
-            <Content item={DATA[0]} />
+            {DATA.map((item, index) => {
+              const inputRange = [
+                (index - 0.2) * width,
+                index * width,
+                (index + 0.2) * width,
+              ];
+              const outputRange = [0, 1, 0];
+              const rotateY = scrollX.interpolate({
+                inputRange,
+                outputRange: ['45deg', '0deg', '45deg'],
+              });
+
+              return (
+                <Animated.View
+                  key={item.key}
+                  style={{
+                    position: 'absolute',
+                    opacity: scrollX.interpolate({
+                      inputRange,
+                      outputRange,
+                    }),
+                    transform: [{ perspective: IMAGE_WIDTH * 4 }, { rotateY }],
+                  }}
+                >
+                  <Content item={item} />
+                </Animated.View>
+              );
+            })}
           </View>
-          <View
+          <Animated.View
             style={{
               width: IMAGE_WIDTH + SPACING * 2,
               position: 'absolute',
@@ -156,6 +209,15 @@ export default function () {
                 width: 0,
                 height: 0,
               },
+              transform: [
+                { perspective: IMAGE_WIDTH * 4 },
+                {
+                  rotateY: progress.interpolate({
+                    inputRange: [0, 0.5, 1],
+                    outputRange: ['0deg', '90deg', '180deg'],
+                  }),
+                },
+              ],
             }}
           />
         </View>
@@ -170,19 +232,15 @@ export default function () {
         >
           <TouchableOpacity
             onPress={() => scrollToIndex(activeIndex - 1)}
-            disabled={activeIndex === 0 ? true : false}
+            disabled={activeIndex === 0}
+            style={{ opacity: activeIndex === 0 ? 0.2 : 1 }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <AntDesign
-                name="swapleft"
-                size={42}
-                color={activeIndex === 0 ? 'grey' : 'black'}
-              />
+              <AntDesign name="swapleft" size={42} color="black" />
               <Text
                 style={{
                   fontSize: 12,
                   fontWeight: '800',
-                  color: `${activeIndex === 0 ? 'grey' : 'black'}`,
                 }}
               >
                 PREV
@@ -192,25 +250,20 @@ export default function () {
 
           <TouchableOpacity
             onPress={() => scrollToIndex(activeIndex + 1)}
-            disabled={activeIndex === DATA.length - 1 ? true : false}
+            disabled={activeIndex === DATA.length - 1}
+            style={{ opacity: activeIndex === DATA.length - 1 ? 0.2 : 1 }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text
                 style={{
                   fontSize: 12,
                   fontWeight: '800',
-                  color: `${
-                    activeIndex === DATA.length - 1 ? 'grey' : 'black'
-                  }`,
+                  color: 'black',
                 }}
               >
                 NEXT
               </Text>
-              <AntDesign
-                name="swapright"
-                size={42}
-                color={activeIndex === DATA.length - 1 ? 'grey' : 'black'}
-              />
+              <AntDesign name="swapright" size={42} />
             </View>
           </TouchableOpacity>
         </View>
